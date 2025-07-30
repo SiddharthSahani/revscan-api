@@ -68,6 +68,7 @@ def clean_text(string: str) -> str:
 
 
 def batch_pages(page_count: int) -> list[tuple[int, int]]:
+    page_count = min(page_count, MAX_REVIEW_PAGES)
     batches = []
     pages_per_thread, remainder = divmod(page_count, NUM_THREADS)
 
