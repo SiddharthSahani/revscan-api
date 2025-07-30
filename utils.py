@@ -47,6 +47,22 @@ class FlipkartReview:
         }
 
 
+@dataclass
+class AmazonProduct:
+    title: str
+    url: str
+    image: str
+    price: str
+
+    def format(self) -> dict[str]:
+        return {
+            "title": self.title,
+            "url": self.url,
+            "image": self.image,
+            "price": self.price,
+        }
+
+
 def make_webdriver():
     options = [
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",

@@ -1,6 +1,6 @@
 
 from utils import *
-from scraper import scrape_reviews
+from scraper import scrape_reviews, get_similar_items_from_amazon
 from ml_models import get_sentiment_scores, get_verifier_scores
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +46,8 @@ async def analyse(request: Request, url: UrlRequest):
     summary = get_llm_summary(reviews[:LLM_REVIEW_COUNT])
     summary = clean_text(summary)
 
+    similar_items = get_similar_items_from_amazon(url_id)
+
     return_data = { 
         "Reviews" : [r.format() for r in reviews],
         "Summary" : summary,
@@ -53,8 +55,7 @@ async def analyse(request: Request, url: UrlRequest):
         "SentimentScore" : (round(mean_sentiment_score * 100)),
         "UserSentiment": user_sentiment,
         "FakeRatio": round(mean_fake_score * 100),
-        "RelatedItems": [],
-        # "RelatedItems": similar_items,
+        "RelatedItems": [r.format() for r in similar_items],
     }
 
     redis.set(url_id, return_data)

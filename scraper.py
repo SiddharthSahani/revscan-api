@@ -124,7 +124,7 @@ def get_total_pages(url: str) -> int:
     try:
         driver = make_webdriver()
         driver.get(url)
-        wait = WebDriverWait(driver, timeout=5.0)
+        wait = WebDriverWait(driver, timeout=3.0)
         page_divs = wait.until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div._1G0WLw.mpIySA"))
         )
@@ -143,3 +143,45 @@ def get_total_pages(url: str) -> int:
         return 1
     finally:
         driver.quit()
+
+
+def get_similar_items_from_amazon(url_id: str) -> list[AmazonProduct]:
+    url_id = url_id.replace("-", "+")
+    driver = make_webdriver()
+    wait = WebDriverWait(driver, timeout=5.0)
+    results = []
+
+    try:
+        driver.get(f"https://www.amazon.in/s?k={url_id}")
+
+        container_xpath = '//div[contains(@class, "puis-card-container")]'
+        wait.until(EC.presence_of_all_elements_located((By.XPATH, container_xpath)))
+
+        images = driver.find_elements(By.XPATH, f'{container_xpath}//img')
+        titles = driver.find_elements(By.XPATH, f'{container_xpath}//a//h2//span')
+        prices = driver.find_elements(By.XPATH, f'{container_xpath}//span[@class="a-price-whole"]')
+        links = driver.find_elements(By.XPATH, f'{container_xpath}//a')
+
+        min_length = min(len(ls) for ls in (images, titles, prices, links))
+        for i in range(min(5, min_length)):
+            img_src = images[i].get_attribute('src')
+            title = titles[i].text
+            price = prices[i].text
+            link = links[i].get_attribute('href')
+
+            # weird bug: some links are 'javascript:void(0)'
+            if not link.startswith('https://'):
+                continue
+
+            results.append(AmazonProduct(
+                title=title,
+                url=link,
+                image=img_src,
+                price=price,
+            ))
+    except Exception as err:
+        logger.error(f"Encountered error while fetching similar products fromm amazon | ERROR: {err}")
+    finally:
+        driver.quit()
+
+    return results
