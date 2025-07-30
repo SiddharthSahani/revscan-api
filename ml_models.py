@@ -9,11 +9,11 @@ import json
 logger = make_logger("ml-model")
 
 
-sentiment_model = torch.jit.load("../ml/sentiment-analysis.pt", map_location="cpu")
+sentiment_model = torch.jit.load("ml-models/sentiment-analysis.pt", map_location="cpu")
 logger.info(f"Loaded sentiment model")
-verifier_model = torch.jit.load("../ml/check-fake.pt", map_location="cpu") 
+verifier_model = torch.jit.load("ml-models/check-fake.pt", map_location="cpu") 
 logger.info(f"Loaded verifier model")
-vocab = json.load(open("../ml/vocab.json"))
+vocab = json.load(open("ml-models/vocab.json"))
 logger.info(f"Loaded model vocabulary: {len(vocab)} words")
 
 
