@@ -3,15 +3,26 @@ from constants import *
 from selenium import webdriver
 from logging import getLogger, StreamHandler, Formatter
 from dataclasses import dataclass
+from pydantic import BaseModel
 import re
 
 
-logger = getLogger("api")
-logger.setLevel("INFO")
-formatter = Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler = StreamHandler()
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+def make_logger(name):
+    logger = getLogger(name)
+    logger.setLevel("INFO")
+    formatter = Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler = StreamHandler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+
+logger = make_logger("api")
+
+
+# used by fast api to create docs and automatic parsing of json body
+class UrlRequest(BaseModel):
+    url: str
 
 
 @dataclass
@@ -70,6 +81,19 @@ def get_uuid(url: str) -> str:
     start = 'https://www.flipkart.com/'
     assert url.startswith(start)
     return url.replace(start, "").split("/")[0]
+
+
+def get_sentiment_text(text: str) -> str:
+    if 0.0 <= text < 0.05:
+        return "very negative"
+    elif 0.05 <= text < 0.15:
+        return "negative"
+    elif 0.15 <= text < 0.35:
+        return "neutral"
+    elif 0.35 <= text < 0.75:
+        return "positive"
+    else:
+        return "very positive"
 
 
 def clean_text(string: str) -> str:

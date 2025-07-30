@@ -1,17 +1,20 @@
 
-from utils import logger
+from utils import make_logger
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from nltk.tokenize import word_tokenize
 import json
 
 
+logger = make_logger("ml-model")
+
+
 sentiment_model = torch.jit.load("../ml/sentiment-analysis.pt", map_location="cpu")
-logger.info(f"[MODEL]: Loaded sentiment model")
+logger.info(f"Loaded sentiment model")
 verifier_model = torch.jit.load("../ml/check-fake.pt", map_location="cpu") 
-logger.info(f"[MODEL]: Loaded verifier model")
+logger.info(f"Loaded verifier model")
 vocab = json.load(open("../ml/vocab.json"))
-logger.info(f"[MODEL]: Loaded model vocabulary: {len(vocab)} words")
+logger.info(f"Loaded model vocabulary: {len(vocab)} words")
 
 
 def get_sentiment_scores(text_list: list[str]) -> list[float]:

@@ -9,15 +9,16 @@ from concurrent.futures import ThreadPoolExecutor
 
 def scrape_reviews(url: str) -> list[FlipkartReview]:
     page_count = get_total_pages(url)
+    url_id = get_uuid(url)
 
     if page_count == 0:
-        logger.warning(f"[ITEM={get_uuid(url)}]: No pages to scrape")
+        logger.warning(f"[ITEM={url_id}]: No pages to scrape")
         return []
     else:
-        logger.info(f"[ITEM={get_uuid(url)}]: {page_count=}")
+        logger.info(f"[ITEM={url_id}]: {page_count=}")
 
     page_batches = batch_pages(page_count)
-    logger.info(f"[ITEM={get_uuid(url)}]: {page_batches=}")
+    logger.info(f"[ITEM={url_id}]: {page_batches=}")
 
     with ThreadPoolExecutor(NUM_THREADS) as executor:
         futures = [
@@ -30,7 +31,7 @@ def scrape_reviews(url: str) -> list[FlipkartReview]:
             for review in future.result()
         ]
 
-    logger.info(f"[ITEM={get_uuid(url)}]: Scraped {len(all_reviews)} reviews")
+    logger.info(f"[ITEM={url_id}]: Scraped {len(all_reviews)} reviews")
     return all_reviews
 
 
@@ -38,6 +39,7 @@ def scrape_multiple_pages(url: str, start: int, end: int, thread_id: int) -> lis
     driver = make_webdriver()
     range_reviews = []
     empty_page_count = 0
+    url_id = get_uuid(url)
 
     try:
         for page in range(start, end+1):
@@ -45,14 +47,14 @@ def scrape_multiple_pages(url: str, start: int, end: int, thread_id: int) -> lis
             range_reviews.extend(page_reviews)
             if not page_reviews:
                 empty_page_count += 1
-                logger.info(f"[ITEM={get_uuid(url)}, PAGE={page}, THREAD={thread_id}]: Page had no reviews, {empty_page_count=}")
+                logger.info(f"[ITEM={url_id}, PAGE={page}, THREAD={thread_id}]: Page had no reviews, {empty_page_count=}")
                 if empty_page_count >= MAX_EMPTY_PAGE_COUNT:
-                    logger.warning(f"[ITEM={get_uuid(url)}, THREAD={thread_id}]: Encountered max amount of empty pages")
+                    logger.warning(f"[ITEM={url_id}, THREAD={thread_id}]: Encountered max amount of empty pages")
                     break
             else:
-                logger.info(f"[ITEM={get_uuid(url)}, PAGE={page}, THREAD={thread_id}]: Page had {len(page_reviews)} reviews")
+                logger.info(f"[ITEM={url_id}, PAGE={page}, THREAD={thread_id}]: Page had {len(page_reviews)} reviews")
     except Exception as err:
-        logger.error(f"[ITEM={get_uuid(url)}, THREAD={thread_id}]: Encountered error while scraping multiple pages | ERROR: {err}")
+        logger.error(f"[ITEM={url_id}, THREAD={thread_id}]: Encountered error while scraping multiple pages | ERROR: {err}")
     finally:
         driver.quit()
 
@@ -104,7 +106,7 @@ def scrape_single_page(driver: webdriver.Chrome, url: str, page: int) -> list[Fl
             ldr_elems = div.find_elements(By.CSS_SELECTOR, "div._6kK6mk")
             review.ldr = [0, 0]
             for ldr_elem in ldr_elems:
-                class_list = div.get_attribute("class").split()
+                class_list = ldr_elem.get_attribute("class").split()
                 if "_6kK6mk" in class_list:
                     if "aQymJL" in class_list:
                         review.ldr[1] = int(ldr_elem.text.strip())
