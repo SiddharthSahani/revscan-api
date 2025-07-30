@@ -24,6 +24,17 @@ class FlipkartReview:
     score: dict[str, float]
     final: float
 
+    def format(self) -> dict[str]:
+        return {
+            'review': self.text,
+            'user': self.user,
+            'rating': self.rating,
+            'time': self.time,
+            'ldr': self.ldr,
+            'score': self.score,
+            'final_score': self.final,
+        }
+
 
 def make_webdriver():
     options = [
