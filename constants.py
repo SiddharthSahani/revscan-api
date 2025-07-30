@@ -9,3 +9,5 @@ MAX_REVIEW_PAGES = 10
 LENGTH_SCORE_NORM = 300
 # interactions for achieving 1.0 in engagement
 VOTES_NORM = 10
+# reviews to be sent to llm
+LLM_REVIEW_COUNT = 25

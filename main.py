@@ -43,7 +43,7 @@ async def analyse(request: Request, url: UrlRequest):
     mean_fake_score = sum(r.score['plag'] > 0.5 for r in reviews) / len(reviews)
     user_sentiment = get_sentiment_text(mean_final_score)
 
-    summary = get_llm_summary(reviews)
+    summary = get_llm_summary(reviews[:LLM_REVIEW_COUNT])
     summary = clean_text(summary)
 
     return_data = { 
