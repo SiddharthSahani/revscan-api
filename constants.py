@@ -11,3 +11,6 @@ LENGTH_SCORE_NORM = 300
 VOTES_NORM = 10
 # reviews to be sent to llm
 LLM_REVIEW_COUNT = 25
+
+# if the max page count is lower than the threads present, its just a waste
+NUM_THREADS = min(NUM_THREADS, MAX_REVIEW_PAGES)
