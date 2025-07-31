@@ -4,6 +4,9 @@ from scraper import scrape_reviews, get_similar_items_from_amazon
 from ml_models import get_sentiment_scores, get_verifier_scores
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from upstash_redis import Redis
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -12,10 +15,25 @@ import json
 
 
 load_dotenv()
+
 app = FastAPI()
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(
+    CORSMiddleware,
+    # TODO: change required
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_credentials=True,
+    allow_headers=["*"]
+)
+
 redis = Redis.from_env()
+
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 llm_model = genai.GenerativeModel("gemini-1.5-flash")
+
 logger = make_logger("entry")
 
 
@@ -25,6 +43,7 @@ def health_check():
 
 
 @app.post("/analyse")
+@limiter.limit(f"{HITS_PER_MINUTE}/minute")
 async def analyse(request: Request, url: UrlRequest):
     url = url.url
     url_id = get_uuid(url)
@@ -107,4 +126,9 @@ def get_llm_summary(reviews: list[FlipkartReview]) -> str:
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run("main:app", reload=True)
+    DEV_MODE = True
+
+    if DEV_MODE:
+        uvicorn.run("main:app", reload=True)
+    else:
+        uvicorn.run("main:app", host='0.0.0.0')

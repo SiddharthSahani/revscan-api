@@ -1,4 +1,6 @@
 
+# rate limiting
+HITS_PER_MINUTE = 5
 # how many threads to use for scraping
 NUM_THREADS = 16
 # maximum amount of empty pages after which scraping is terminated for the thread
