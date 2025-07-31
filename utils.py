@@ -9,6 +9,9 @@ import re
 
 def make_logger(name):
     logger = getLogger(name)
+    if logger.handlers:
+        return logger
+
     logger.setLevel("INFO")
     formatter = Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler = StreamHandler()
