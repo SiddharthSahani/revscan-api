@@ -104,14 +104,14 @@ def get_uuid(url: str) -> str:
     return url.replace(start, "").split("/")[0]
 
 
-def get_sentiment_text(text: str) -> str:
-    if 0.0 <= text < 0.05:
+def get_sentiment_text(score: float) -> str:
+    if 0.0 <= score < 0.05:
         return "very negative"
-    elif 0.05 <= text < 0.15:
+    elif 0.05 <= score < 0.15:
         return "negative"
-    elif 0.15 <= text < 0.35:
+    elif 0.15 <= score < 0.35:
         return "neutral"
-    elif 0.35 <= text < 0.75:
+    elif 0.35 <= score < 0.75:
         return "positive"
     else:
         return "very positive"
