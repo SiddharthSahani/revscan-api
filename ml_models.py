@@ -2,6 +2,9 @@
 from utils import make_logger
 import torch
 from torch.nn.utils.rnn import pad_sequence
+import nltk
+nltk.download("punkt")
+nltk.download("punkt_tab")
 from nltk.tokenize import word_tokenize
 import json
 
