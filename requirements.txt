@@ -1,0 +1,11 @@
+selenium
+pydantic
+fastapi
+uvicorn
+slowapi
+upstash-redis
+google-generativeai
+torch
+nltk
+python-dotenv
+numpy
