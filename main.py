@@ -47,7 +47,7 @@ def health_check():
 async def analyse(request: Request, url: UrlRequest):
     url = url.url
     url_id = get_uuid(url)
-    logger.info(f"Hit with {url_id!r}")
+    logger.info(f"Hit with {url_id!r}, {url=}")
 
     if res := redis.get(url_id):
         logger.info(f"Returning data for {url_id!r} from cache")
