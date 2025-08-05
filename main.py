@@ -29,7 +29,12 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-redis = Redis.from_env()
+try:
+    redis = Redis.from_env()
+    logger.info("Successfully connected to Redis")
+except Exception as e:
+    logger.error(f"Failed to connect to Redis: {e}")
+    redis = None
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 llm_model = genai.GenerativeModel("gemini-1.5-flash")
@@ -49,9 +54,14 @@ async def analyse(request: Request, url: UrlRequest):
     url_id = get_uuid(url)
     logger.info(f"Hit with {url_id!r}, {url=}")
 
-    if res := redis.get(url_id):
-        logger.info(f"Returning data for {url_id!r} from cache")
-        return json.loads(res)
+    # Check cache only if Redis is available
+    if redis:
+        try:
+            if res := redis.get(url_id):
+                logger.info(f"Returning data for {url_id!r} from cache")
+                return json.loads(res)
+        except Exception as e:
+            logger.warning(f"Redis get failed: {e}")
 
     logger.info(f"Processing {url_id!r}")
 
@@ -77,8 +87,14 @@ async def analyse(request: Request, url: UrlRequest):
         "RelatedItems": [r.format() for r in similar_items],
     }
 
-    redis.set(url_id, return_data)
-    logger.info(f"Dumped data to redis for {url_id!r}")
+    # Save to cache only if Redis is available
+    if redis:
+        try:
+            redis.set(url_id, return_data)
+            logger.info(f"Dumped data to redis for {url_id!r}")
+        except Exception as e:
+            logger.warning(f"Redis set failed: {e}")
+    
     return return_data
 
 
