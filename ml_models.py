@@ -29,9 +29,6 @@ def get_verifier_scores(text_list: list[str]) -> list[float]:
 
 
 def _use_model(model, text_list: list[str]):
-    # Guard against empty input
-    if not text_list:
-        return []
     tensors = _batch_tensors(text_list)
     model.eval()
     with torch.no_grad():
@@ -46,18 +43,9 @@ def _encode_text(text):
 
 
 def _batch_tensors(reviews):
-    # Guard against empty input
-    if not reviews:
-        return torch.tensor([])
-    
-    # Filter out empty reviews
-    valid_reviews = [text for text in reviews if text and text.strip()]
-    if not valid_reviews:
-        return torch.tensor([])
-    
     batched_tensors = pad_sequence([
         _encode_text(text)
-        for text in valid_reviews
+        for text in reviews
     ], batch_first=True)
 
     return batched_tensors
