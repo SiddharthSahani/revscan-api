@@ -33,8 +33,11 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Check where chromium-driver is installed and create symlink if needed
-RUN which chromium && which chromedriver || (find /usr -name "chromedriver" -o -name "chromium-driver" 2>/dev/null && ln -sf /usr/lib/chromium-browser/chromedriver /usr/bin/chromedriver)
+# Ensure ChromeDriver is executable and verify installation
+RUN chmod +x /usr/bin/chromedriver || true
+
+# Verify Chrome and ChromeDriver are working
+RUN chromium --version && chromedriver --version
 
 COPY requirements.txt .
 
@@ -44,6 +47,9 @@ RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 RUN mkdir /app/tmp
 
+# Copy .env file first for environment variables
+COPY .env .
+
 COPY . .
 
 EXPOSE 8000
@@ -52,5 +58,27 @@ EXPOSE 8000
 ENV DISPLAY=:99
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMIUM_FLAGS="--no-sandbox --disable-dev-shm-usage"
+ENV PYTHONUNBUFFERED=1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "=== Container Startup Debug ==="\n\
+echo "Starting application..."\n\
+echo "Chrome version: $(chromium --version)"\n\
+echo "ChromeDriver version: $(chromedriver --version)"\n\
+echo "Python version: $(python --version)"\n\
+echo "Working directory: $(pwd)"\n\
+echo "Files in /app:"\n\
+ls -la /app/\n\
+echo "Environment variables:"\n\
+printenv | grep -E "(REDIS|GEMINI|PYTHON)" || true\n\
+echo "Testing Python imports..."\n\
+python -c "import fastapi; print(\"FastAPI OK\")"\n\
+python -c "from selenium import webdriver; print(\"Selenium OK\")"\n\
+python -c "import torch; print(\"PyTorch OK\")"\n\
+echo "Starting FastAPI server..."\n\
+exec uvicorn main:app --host 0.0.0.0 --port 8000 --log-level debug' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
