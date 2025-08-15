@@ -66,21 +66,101 @@ class AmazonProduct:
 
 
 def make_webdriver():
+    from selenium.webdriver.chrome.service import Service
+    import os
+    import time
+    import random
+    
+    # Use different user agents to avoid detection
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ]
+    
+    selected_user_agent = random.choice(user_agents)
+    
     options = [
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        f"--user-agent={selected_user_agent}",
         "--accept-language=en-US,en;q=0.9",
-        "--headless",
+        "--headless=new",  # Keep headless for Docker
         "--no-sandbox",
         "--disable-dev-shm-usage",
-        "-user-data-dir=/app/tmp",
+        "--disable-gpu",
+        "--disable-blink-features=AutomationControlled",  # Hide automation
+        "--exclude-switches=enable-automation",  # Hide automation
+        "--disable-extensions-except=/usr/lib/chromium-browser/extensions",
+        "--disable-plugins-except=/usr/lib/chromium-browser/plugins",
+        "--window-size=1366,768",  # More common resolution
+        "--disable-web-security",
+        "--allow-running-insecure-content",
+        "--disable-ipc-flooding-protection",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-features=TranslateUI,VizDisplayCompositor",
+        "--disable-default-apps",
+        "--disable-hang-monitor",
+        "--disable-prompt-on-repost",
+        "--disable-sync",
+        "--metrics-recording-only",
+        "--no-first-run",
+        "--safebrowsing-disable-auto-update",
+        "--user-data-dir=/app/tmp",
+        "--crash-dumps-dir=/tmp",
+        "--disable-crash-reporter",
+        "--enable-logging",
+        "--log-level=0",
+        "--v=1",
     ]
 
     webdriver_options = webdriver.ChromeOptions()
+    webdriver_options.binary_location = "/usr/bin/chromium"
+    
+    # Add experimental options to make browser less detectable
+    webdriver_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    webdriver_options.add_experimental_option('useAutomationExtension', False)
+    
     for opt in options:
         webdriver_options.add_argument(opt)
 
-    logger.info("Created webdriver.Chrome instance")
-    return webdriver.Chrome(webdriver_options)
+    # Try to find the ChromeDriver in various possible locations
+    possible_driver_paths = [
+        "/usr/bin/chromedriver",
+        "/usr/lib/chromium-browser/chromedriver",
+        "/usr/bin/chromium-driver"
+    ]
+    
+    driver_path = None
+    for path in possible_driver_paths:
+        if os.path.exists(path):
+            driver_path = path
+            break
+    
+    # Retry logic for webdriver creation
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if driver_path:
+                service = Service(driver_path)
+                driver = webdriver.Chrome(service=service, options=webdriver_options)
+                
+                # Execute script to hide webdriver property
+                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                
+                logger.info(f"Created webdriver.Chrome instance with driver at {driver_path} (attempt {attempt + 1})")
+                return driver
+            else:
+                # Fallback to default (may not work on ARM64)
+                logger.warning("ChromeDriver not found in expected locations, using default")
+                return webdriver.Chrome(options=webdriver_options)
+        except Exception as e:
+            logger.error(f"Failed to create webdriver (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # Wait 2 seconds before retry
+            else:
+                raise e
 
 
 def score_reviews(reviews: list[FlipkartReview]) -> None:
@@ -118,9 +198,11 @@ def get_sentiment_text(score: float) -> str:
 
 
 def clean_text(string: str) -> str:
-    string = re.sub(r"[^a-zA-Z0-9\s]", "", string)
+    if not string:
+        return ""
     string = re.sub(r"\s+", " ", string.strip())
-    return string.replace("READ MORE", "").strip()
+    string = string.replace("READ MORE", "").strip()
+    return string
 
 
 def batch_pages(page_count: int) -> list[tuple[int, int]]:

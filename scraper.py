@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 
 def scrape_reviews(url: str) -> list[FlipkartReview]:
@@ -36,14 +37,39 @@ def scrape_reviews(url: str) -> list[FlipkartReview]:
 
 
 def scrape_multiple_pages(url: str, start: int, end: int, thread_id: int) -> list[FlipkartReview]:
-    driver = make_webdriver()
+    driver = None
     range_reviews = []
     empty_page_count = 0
     url_id = get_uuid(url)
 
     try:
+        driver = make_webdriver()
         for page in range(start, end+1):
-            page_reviews = scrape_single_page(driver, url, page)
+            # small backoff between pages
+            time.sleep(0.5)  # Increased from 0.2 to 0.5 for better stability
+            
+            # retry each page once if it fails due to transient errors
+            max_page_retries = 2
+            page_reviews = []
+            
+            for retry in range(max_page_retries):
+                try:
+                    page_reviews = scrape_single_page(driver, url, page)
+                    break  # Success, exit retry loop
+                except Exception as e:
+                    logger.warning(f"[ITEM={url_id}, PAGE={page}, THREAD={thread_id}]: Error on attempt {retry + 1}: {e}")
+                    if retry < max_page_retries - 1:  # Not the last retry
+                        try:
+                            if driver:
+                                driver.quit()
+                        except:
+                            pass
+                        time.sleep(1)  # Wait before retry
+                        driver = make_webdriver()
+                    else:
+                        logger.error(f"[ITEM={url_id}, PAGE={page}, THREAD={thread_id}]: Failed after {max_page_retries} attempts")
+                        page_reviews = []  # Empty list on failure
+            
             range_reviews.extend(page_reviews)
             if not page_reviews:
                 empty_page_count += 1
@@ -56,24 +82,42 @@ def scrape_multiple_pages(url: str, start: int, end: int, thread_id: int) -> lis
     except Exception as err:
         logger.error(f"[ITEM={url_id}, THREAD={thread_id}]: Encountered error while scraping multiple pages | ERROR: {err}")
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+            except Exception as e:
+                logger.warning(f"[ITEM={url_id}, THREAD={thread_id}]: Error while quitting driver: {e}")
 
     return range_reviews
 
 
 def scrape_single_page(driver: webdriver.Chrome, url: str, page: int) -> list[FlipkartReview]:
     paged_url = f"{url}&page={page}"
-    driver.get(paged_url)
+    logger.info(f"[PAGE={page}] Navigating to: {paged_url}")
+    
+    try:
+        driver.get(paged_url)
+        logger.info(f"[PAGE={page}] Successfully loaded page, current URL: {driver.current_url}")
+        logger.info(f"[PAGE={page}] Page title: {driver.title}")
+    except Exception as e:
+        logger.error(f"[PAGE={page}] Failed to load page: {e}")
+        return []
 
-    wait = WebDriverWait(driver, timeout=3.0)
+    wait = WebDriverWait(driver, timeout=8.0)
     try:
         wait.until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.EKFha-"))
         )
-    except:
+        logger.info(f"[PAGE={page}] Found review elements on page")
+    except Exception as e:
+        logger.warning(f"[PAGE={page}] Review elements not found: {e}")
+        logger.info(f"[PAGE={page}] Page source length: {len(driver.page_source)}")
+        # Log first 500 chars of page source to see what we got
+        logger.info(f"[PAGE={page}] Page source preview: {driver.page_source[:500]}")
         return []
 
     reviews_divs = driver.find_elements(By.CSS_SELECTOR, "div.EKFha-")
+    logger.info(f"[PAGE={page}] Found {len(reviews_divs)} review divs")
     result = []
 
     for div in reviews_divs:
@@ -121,28 +165,72 @@ def scrape_single_page(driver: webdriver.Chrome, url: str, page: int) -> list[Fl
 
 
 def get_total_pages(url: str) -> int:
+    import time
+    import random
+    
+    driver = None
     try:
+        logger.info(f"[get_total_pages] Starting for URL: {url}")
         driver = make_webdriver()
+        logger.info(f"[get_total_pages] WebDriver created, navigating to URL")
+        
+        # Add random delay to seem more human-like
+        time.sleep(random.uniform(1, 3))
+        
+        # Test with a simple page first to check connectivity
+        try:
+            driver.get("https://www.google.com")
+            logger.info(f"[get_total_pages] Google test successful, title: {driver.title}")
+        except Exception as e:
+            logger.error(f"[get_total_pages] Google test failed: {e}")
+            return 1
+        
+        # Add another delay before going to Flipkart
+        time.sleep(random.uniform(2, 4))
+        
         driver.get(url)
-        wait = WebDriverWait(driver, timeout=3.0)
+        logger.info(f"[get_total_pages] Page loaded, current URL: {driver.current_url}")
+        logger.info(f"[get_total_pages] Page title: {driver.title}")
+        
+        # Wait a bit for page to fully load
+        time.sleep(random.uniform(2, 5))
+        
+        wait = WebDriverWait(driver, timeout=10.0)  # Increased timeout
+        logger.info(f"[get_total_pages] Waiting for pagination elements...")
         page_divs = wait.until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div._1G0WLw.mpIySA"))
         )
+        logger.info(f"[get_total_pages] Found {len(page_divs)} pagination divs")
 
-        for div in page_divs:
+        for i, div in enumerate(page_divs):
             try:
                 span = div.find_element(By.TAG_NAME, "span")
-                if "Page" in span.text and "of" in span.text:
-                    return int(span.text.strip().split()[-1])
-            except:
-                pass
+                span_text = span.text
+                logger.info(f"[get_total_pages] Pagination div {i}: '{span_text}'")
+                if "Page" in span_text and "of" in span_text:
+                    total_pages = int(span_text.strip().split()[-1])
+                    logger.info(f"[get_total_pages] Found total pages: {total_pages}")
+                    return total_pages
+            except Exception as e:
+                logger.warning(f"[get_total_pages] Error processing pagination div {i}: {e}")
+                
         logger.error(f"[ITEM={get_uuid(url)}]: Unable to find the number of pages of reviews")
+        logger.info(f"[get_total_pages] Page source length: {len(driver.page_source)}")
+        logger.info(f"[get_total_pages] Page source preview: {driver.page_source[:1000]}")
         return 1
     except Exception as err:
         logger.error(f"[ITEM={get_uuid(url)}] Encountered error while finding the number of pages of reviews | ERROR: {err}")
+        if driver:
+            try:
+                logger.info(f"[get_total_pages] Error occurred, current URL: {driver.current_url}")
+                logger.info(f"[get_total_pages] Error page source length: {len(driver.page_source)}")
+                logger.info(f"[get_total_pages] Error page source preview: {driver.page_source[:1000]}")
+            except:
+                logger.warning("[get_total_pages] Could not get page source after error")
         return 1
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
 
 
 def get_similar_items_from_amazon(url_id: str) -> list[AmazonProduct]:

@@ -67,6 +67,19 @@ async def analyse(request: Request, url: UrlRequest):
 
     reviews = get_processed_reviews(url)
 
+    # If scraping failed or returned nothing, short-circuit with a friendly response
+    if not reviews:
+        logger.warning(f"No reviews scraped for {url_id!r}; returning empty result.")
+        return {
+            "Reviews": [],
+            "Summary": "",
+            "ReviewsScraped": 0,
+            "SentimentScore": 0,
+            "UserSentiment": "neutral",
+            "FakeRatio": 0,
+            "RelatedItems": [],
+        }
+
     mean_final_score = sum(r.final for r in reviews) / len(reviews)
     mean_sentiment_score = sum(r.score['sent'] for r in reviews) / len(reviews)
     mean_fake_score = sum(r.score['plag'] > 0.5 for r in reviews) / len(reviews)
@@ -102,9 +115,18 @@ def get_processed_reviews(url: str):
     reviews = scrape_reviews(url)
     score_reviews(reviews)
 
-    review_texts = [r.text for r in reviews]
-    sentiment_scores = get_sentiment_scores(review_texts)
-    verifier_scores = get_verifier_scores(review_texts)
+    # Run ML only on reviews that have text; align results back by index
+    text_indices = [i for i, r in enumerate(reviews) if r.text and r.text.strip()]
+    review_texts = [reviews[i].text for i in text_indices]
+    
+    # Only run ML models if we have valid text reviews
+    if review_texts:
+        sentiment_scores = get_sentiment_scores(review_texts)
+        verifier_scores = get_verifier_scores(review_texts)
+    else:
+        sentiment_scores = []
+        verifier_scores = []
+        logger.warning("No valid review texts found for ML processing")
 
     grads = {
         "ldr": 0.0829,
@@ -114,9 +136,15 @@ def get_processed_reviews(url: str):
         "plag": 0.4035,
     }
 
-    for review, sentiment, plagarism in zip(reviews, sentiment_scores, verifier_scores):
-        review.score['sent'] = sentiment
-        review.score['plag'] = plagarism
+    # Initialize defaults
+    for r in reviews:
+        r.score.setdefault('sent', 0.0)
+        r.score.setdefault('plag', 0.0)
+
+    # Assign scores to the corresponding reviews with text
+    for idx, sentiment, plagarism in zip(text_indices, sentiment_scores, verifier_scores):
+        reviews[idx].score['sent'] = float(sentiment)
+        reviews[idx].score['plag'] = float(plagarism)
 
     for review in reviews:
         review.final = sum(grads[k] * review.score[k] for k in grads)
