@@ -65,22 +65,35 @@ class AmazonProduct:
         }
 
 
-def make_webdriver():
+def make_webdriver(use_proxy=False):
     from selenium.webdriver.chrome.service import Service
     import os
     import time
     import random
-    
+
     # Use different user agents to avoid detection
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     ]
-    
+
+    proxies = [
+        "23.95.150.145:6114",
+        "198.23.239.134:6540",
+        "45.38.107.97:6014",
+        "207.244.217.165:6712",
+        "107.172.163.27:6543",
+        "104.222.161.211:6343",
+        "64.137.96.74:6641",
+        "216.10.27.159:6837",
+        "136.0.207.84:6661",
+        "142.147.128.93:6593",
+    ]
+
     selected_user_agent = random.choice(user_agents)
-    
+
     options = [
         f"--user-agent={selected_user_agent}",
         "--accept-language=en-US,en;q=0.9",
@@ -115,13 +128,16 @@ def make_webdriver():
         "--v=1",
     ]
 
+    if use_proxy:
+        options.append(f"--proxy-server={random.choice(proxies)}")
+
     webdriver_options = webdriver.ChromeOptions()
     webdriver_options.binary_location = "/usr/bin/chromium"
-    
+
     # Add experimental options to make browser less detectable
     webdriver_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    webdriver_options.add_experimental_option('useAutomationExtension', False)
-    
+    webdriver_options.add_experimental_option("useAutomationExtension", False)
+
     for opt in options:
         webdriver_options.add_argument(opt)
 
@@ -129,15 +145,15 @@ def make_webdriver():
     possible_driver_paths = [
         "/usr/bin/chromedriver",
         "/usr/lib/chromium-browser/chromedriver",
-        "/usr/bin/chromium-driver"
+        "/usr/bin/chromium-driver",
     ]
-    
+
     driver_path = None
     for path in possible_driver_paths:
         if os.path.exists(path):
             driver_path = path
             break
-    
+
     # Retry logic for webdriver creation
     max_retries = 3
     for attempt in range(max_retries):
@@ -145,18 +161,26 @@ def make_webdriver():
             if driver_path:
                 service = Service(driver_path)
                 driver = webdriver.Chrome(service=service, options=webdriver_options)
-                
+
                 # Execute script to hide webdriver property
-                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-                
-                logger.info(f"Created webdriver.Chrome instance with driver at {driver_path} (attempt {attempt + 1})")
+                driver.execute_script(
+                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+                )
+
+                logger.info(
+                    f"Created webdriver.Chrome instance with driver at {driver_path} (attempt {attempt + 1})"
+                )
                 return driver
             else:
                 # Fallback to default (may not work on ARM64)
-                logger.warning("ChromeDriver not found in expected locations, using default")
+                logger.warning(
+                    "ChromeDriver not found in expected locations, using default"
+                )
                 return webdriver.Chrome(options=webdriver_options)
         except Exception as e:
-            logger.error(f"Failed to create webdriver (attempt {attempt + 1}/{max_retries}): {e}")
+            logger.error(
+                f"Failed to create webdriver (attempt {attempt + 1}/{max_retries}): {e}"
+            )
             if attempt < max_retries - 1:
                 time.sleep(2)  # Wait 2 seconds before retry
             else:
