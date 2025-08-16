@@ -1,8 +1,7 @@
-
 # rate limiting
 HITS_PER_MINUTE = 5
 # how many threads to use for scraping (kept low for stability in containers)
-NUM_THREADS = 1  # Reduced to 1 for Docker stability
+NUM_THREADS = 4
 # maximum amount of empty pages after which scraping is terminated for the thread
 MAX_EMPTY_PAGE_COUNT = 3
 # max amount of pages that can be scraped per product

@@ -190,16 +190,6 @@ def get_total_pages(url: str) -> int:
         # Add random delay to seem more human-like
         time.sleep(random.uniform(1, 3))
 
-        # Test with a simple page first to check connectivity
-        try:
-            driver.get("https://www.google.com")
-            logger.info(
-                f"[get_total_pages] Google test successful, title: {driver.title}"
-            )
-        except Exception as e:
-            logger.error(f"[get_total_pages] Google test failed: {e}")
-            return 1
-
         # Add another delay before going to Flipkart
         time.sleep(random.uniform(2, 4))
 

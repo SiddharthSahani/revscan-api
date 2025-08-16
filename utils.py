@@ -1,4 +1,5 @@
 from constants import *
+import tempfile
 from selenium import webdriver
 from logging import getLogger, StreamHandler, Formatter
 from dataclasses import dataclass
@@ -94,6 +95,9 @@ def make_webdriver(use_proxy=False):
 
     selected_user_agent = random.choice(user_agents)
 
+    temp_dir = tempfile.mkdtemp()
+    print(f"Creating temporary directory: {temp_dir}")
+
     options = [
         f"--user-agent={selected_user_agent}",
         "--accept-language=en-US,en;q=0.9",
@@ -120,7 +124,7 @@ def make_webdriver(use_proxy=False):
         "--metrics-recording-only",
         "--no-first-run",
         "--safebrowsing-disable-auto-update",
-        "--user-data-dir=/app/tmp",
+        f"--user-data-dir={temp_dir}",
         "--crash-dumps-dir=/tmp",
         "--disable-crash-reporter",
         "--enable-logging",
