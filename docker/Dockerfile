@@ -2,24 +2,37 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y build-essential python3-dev libffi-dev libssl-dev curl git wget unzip
+# Install system dependencies including Chromium
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    git \
+    wget \
+    unzip \
+    chromium \
+    chromium-driver \
+    && rm -rf /var/lib/apt/lists/*
 
+# Copy and install Python dependencies
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
-
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-RUN wget https://dl.google.com/linux/deb/pool/main/g/google-chrome-stable/google-chrome-stable_138.0.7204.183-1_amd64.deb
+# Create tmp directory
+RUN mkdir -p /app/tmp
 
-RUN apt install -y ./google-chrome-stable_138.0.7204.183-1_amd64.deb
-
-RUN rm google-chrome-stable_138.0.7204.183-1_amd64.deb
-
-RUN mkdir /app/tmp
-
+# Copy application code
 COPY . .
+
+# Set environment variables for Chrome
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Simple startup command
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
