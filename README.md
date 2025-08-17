@@ -17,7 +17,7 @@ Unboxd is the backend API for a web extension called **Unboxd**. It provides the
 ## Geting Sstarted
 
 1. Clone the repository
-2. Create a new virtual environment (optional but recommended)
+2. Create a new virtual environment (optional but recommended, pls do it)
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
